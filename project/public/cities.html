@@ -382,44 +382,55 @@ function initMap() {
     });
 }
 
-function calculateDistance() {
-	if (isMultiplayer) {
-  const pos = marker.getPosition();
-  socket.emit('sendGuess', { roomId, lat: pos.lat(), lng: pos.lng() });
-} else {
-  
-
+document.getElementById("calculate-distance").addEventListener("click", function() {
     if (!marker) {
         OpenMarkerPopup();
         return;
     }
 
     const markerPosition = marker.getPosition();
-    const distance = google.maps.geometry.spherical.computeDistanceBetween(
-        new google.maps.LatLng(panoramaLocation),
-        markerPosition
-    ) / 1000;
 
-    const distanceInKm = distance.toFixed(2);
+    if (isMultiplayer) {
+        if (myGuessSent) {
+            alert("Уже отправил угадывание!");
+            return;
+        }
 
-    const maxDistance = 20000;
-    const score = Math.max(0, 5000 * (1 - Math.log(distance + 1) / Math.log(maxDistance + 1)));
+        socket.emit('sendGuess', {
+            roomId: roomId,
+            lat: markerPosition.lat(),
+            lng: markerPosition.lng()
+        });
 
-    document.getElementById("score").innerText = Math.round(score);
-    document.getElementById("location-name").innerText = panoramaLocation.name;
-    document.getElementById("distanceInKm").innerText = distanceInKm;
+        myGuessSent = true;
+        // Можно показать "Ждём второго игрока..."
+        // document.getElementById("timer").innerText = "Ожидание...";
+    } else {
+        // ────────────────────────────────
+        // ОДИНОЧНАЯ ИГРА — здесь вся старая логика
+        // ────────────────────────────────
+        const distance = google.maps.geometry.spherical.computeDistanceBetween(
+            new google.maps.LatLng(panoramaLocation),
+            markerPosition
+        ) / 1000;
 
-    saveScore(score);
-    stopTimer();
+        const distanceInKm = distance.toFixed(2);
+        const maxDistance = 20000; // твоё максимальное расстояние
+        const score = Math.max(0, 5000 * (1 - Math.log(distance + 1) / Math.log(maxDistance + 1)));
 
-    // Показываем анимацию, а попап вызываем только после неё
-    showRealLocation(() => {
-        openPopup();
-	
-    });
-}
-}
+        document.getElementById("score").innerText = Math.round(score);
+        document.getElementById("location-name").innerText = panoramaLocation.name;
+        document.getElementById("distanceInKm").innerText = distanceInKm;
 
+        saveScore(score);
+        stopTimer();
+
+        // Показываем анимацию → попап
+        showRealLocation(() => {
+            openPopup();
+        });
+    }
+});
 
 		
 		function TimeUp() {
@@ -722,6 +733,7 @@ mapContainer.addEventListener("mouseleave", () => {
 </body>
 
 </html>
+
 
 
 
