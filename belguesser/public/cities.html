@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BelGuessr - угадай город!</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            background-color: #f4f4f9;
+        }
+		#top-scores {
+			position: relative;
+			z-index: 10;  /* Убедитесь, что значение z-index больше, чем у других элементов */
+		}
+
+		#score-list {
+			position: relative;
+			z-index: 10;  /* Тот же z-index для списка */
+		}
+
+#map-container {
+    float: right;
+    position: relative;
+    top: 10px;
+    right: 10px;
+    width: 287px;   /* 70% от исходного 410px */
+    height: 280px;  /* 70% от исходного 400px */
+    border: 2px solid #000;
+    border-radius: 8px;
+    background-color: #fff;
+    z-index: 2;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transition: width 0.3s, height 0.3s;
+}
+
+/* Hover для карты, пока маркер не поставлен */
+#map-container.hoverable:hover {
+    width: 533px;   /* 130% от исходного */
+    height: 520px;  /* 130% от исходного */
+}
+
+/* Контейнер кнопок привязан к карте */
+#button-container {
+    position: absolute;
+    top: calc(10px + 280px + 10px); /* под картой */
+    right: 10px;
+    z-index: 2;
+    display: flex;            /* горизонтальный ряд */
+    gap: 7px;                 /* расстояние между кнопками */
+    width: 287px;             /* общая ширина контейнера = ширине карты */
+    transition: top 0.3s, width 0.3s; /* плавное движение и изменение ширины */
+}
+
+#button-container button {
+    flex: 1;                  /* кнопки делят контейнер поровну */
+    padding: 10px 0;
+    font-size: 14px;
+    font-weight: bold;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+    background-color: #007bff;
+    color: #fff;
+    transition: background-color 0.3s, flex 0.3s; /* плавная адаптация к изменению flex */
+}
+
+#button-container button:hover {
+    background-color: #66CDAA;
+}
+
+#leavebutton {
+    position: absolute;
+    top: calc(10px + 280px + 60px); /* чуть ниже первой кнопки */
+    right: 10px;
+    z-index: 2;
+    transition: top 0.3s, right 0.3s;
+}
+
+/* Кнопки */
+#calculate-distance, #leave {
+    padding: 10px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    color: #fff;
+    background-color: #007bff;
+    border: none;
+    border-radius: 30px;
+    width: 270px;
+    cursor: pointer;
+}
+
+#calculate-distance:hover, #leave:hover {
+    background-color: #66CDAA;
+}
+
+        #popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+            text-align: center;
+        }
+
+        #popup h2 {
+            margin: 0 0 10px;
+        }
+
+        #popup button {
+            padding: 10px 20px;
+            font-size: 14px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+
+        #popup button:hover {
+            background-color: #66CDAA;
+        }
+
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 9;
+        }
+
+        #panorama {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+		}
+       #markerPopup {
+			display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+            text-align: center;
+		}
+		#timeup{
+			display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+            text-align: center;}
+		#timeup button{
+			padding: 10px 20px;
+            font-size: 14px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+		}
+		#markerPopup button{
+			padding: 10px 20px;
+            font-size: 14px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+		}
+		#markerPopup button:hover{
+		background-color: #66CDAA;
+		}
+		#timeup button:hover{
+		background-color: #66CDAA;
+		}
+		#timer {
+		position: absolute;
+		top: 20px;
+		left: 20px;
+		font-size: 24px;
+		font-weight: bold;
+		color: #fff;
+		background-color: rgba(0, 0, 0, 0.7);
+		padding: 10px 20px;
+		border-radius: 10px;
+		z-index: 10;
+		}
+		#timer {
+		position: absolute;
+		top: 20px;
+		left: 20px;
+		font-size: 24px;
+		font-weight: bold;
+		color: #fff;
+		background-color: rgba(0, 0, 0, 0.7);
+		padding: 10px 20px;
+		border-radius: 10px;
+		z-index: 10;
+		}
+		#leave{
+			padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 30px;
+            width: 270px;
+            cursor: pointer;
+			z-index:10
+			}
+		#leavebutton{
+			position: absolute;
+			right:75px;;
+			top:490px;
+            
+           
+            z-index: 2;}
+		#leave:hover{
+			background-color: #66CDAA;
+		№top-scores{
+			position:fixed;
+			left:200px;}
+		
+    </style>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBGbr_QILBhKjlGn5KywwhRM4qZEYR3vXk&libraries=geometry"></script>
+</head>
+<body>
+	
+	
+    <div id="map-container"></div>
+<div id="button-container">
+    <button id="calculate-distance">Guess!</button>
+    <button id="leave" onclick="window.location.href='index.html'">Выйти</button>
+</div>
+    <div id="panorama"></div>
+
+    <div id="popup">
+        <h2>Кол-во очков: <span id="score"></span></h2>
+        <p>Локация: <span id="location-name"></span>.</p>
+		<p>Расстояние: <span id = 'distanceInKm'></span>км.</p>
+		<div id="top-scores">
+		<h3>Топ-5 результатов</h3>
+		<div id="score-list">
+        
+		</div>
+		</div>
+        <button onclick="closePopup()">Закрыть</button>
+    </div>
+	<div id = 'markerPopup'>
+		<p>Пожалуйста, установите маркер на карте</p>
+		<button onclick = 'closeMarkerPopup()'>Закрыть</button>
+	</div>
+	<div id = 'timeup'>
+		<h2>Время вышло!<h2>
+		<h2>Кол-во очков:<span id = 'score'></span></h2>
+		<p>Локация: <span id="location-name"></span>.</p>
+		<p>Расстояние: <span id = 'distanceInKm'></span>км.</p>
+		<button onclick="closePopup()">Закрыть</button>
+	</div>
+	
+	<div id = 'timer'>30</div>
+    <div id="overlay"></div>
+    <script>
+        let panorama, map, marker;
+		let realMarker = null;           // Маркер реального положения панорамы
+		let lineBetween = null;          // Линия между маркерами
+        let panoramaLocation;
+		let timeLeft = 30; // Время в секундах
+		let timerInterval;
+        const knownLocations = [
+            { lat: 53.88042,   lng: 27.4855477, name: 'Минск' },
+            { lat: 53.6676981, lng: 23.9069996, name: 'Гродно' }, 
+            { lat: 52.0805018, lng: 23.7169662, name: 'Брест' },
+            { lat: 52.4317027, lng: 30.9938685, name: 'Гомель' },
+            { lat: 53.8980519, lng: 30.3340392, name: 'Могилёв' },
+            { lat: 55.1924057, lng: 30.2067509, name: 'Витебск' },
+            { lat: 55.4846103, lng: 28.7775038, name: 'Полоцк' },
+            { lat: 54.1010124, lng: 28.3285245, name: 'Жодино' },
+            { lat: 52.8163544, lng: 27.5591826, name: 'Солигорск' },
+            { lat: 53.1319188, lng: 26.019032, name: 'Барановичи' },
+            { lat: 53.024559,  lng: 27.5551262, name: 'Слуцк' },
+            { lat: 53.0655604, lng: 26.6419315, name: 'Клецк' },
+            { lat: 53.2225454, lng: 26.6887444, name: 'Несвиж' },
+            { lat: 53.142776, lng:  29.222351, name: 'Бобруйск' },
+            { lat: 53.0823829, lng:30.0537977, name: 'Рогачев' },
+			{ lat: 53.1524453, lng: 27.0908226, name: 'Копыль' }
+        ];
+	
+        function getRandomLocation() {
+            const randomIndex = Math.floor(Math.random() * knownLocations.length);
+            return knownLocations[randomIndex];
+        }
+		
+
+		function startTimer() {
+		    clearInterval(timerInterval); // Очищаем предыдущий интервал
+			document.getElementById("timer").textContent = timeLeft;
+			timerInterval = setInterval(() => {
+				if (timeLeft > 0) {
+					timeLeft--;
+					document.getElementById("timer").textContent = timeLeft;
+				} else {
+					clearInterval(timerInterval);
+					TimeUp();
+				}
+			}, 1000);
+		}
+		function stopTimer() {
+			clearInterval(timerInterval);
+		}
+        function initPanorama() {
+            const randomLocation = getRandomLocation();
+            panoramaLocation = randomLocation;
+            if (panorama) {
+                panorama.setPosition(randomLocation);
+            } else {
+                panorama = new google.maps.StreetViewPanorama(
+                    document.getElementById("panorama"),
+                    {
+                        position: randomLocation,
+                        pov: {
+                            heading: 34,
+                            pitch: 10,
+                        },
+                        zoom: 1,
+                        disableDefaultUI: true,
+                        addressControl: false,
+                    }
+                );
+            }
+			 updateScoreboard(randomLocation.name);
+        }
+		
+		
+function initMap() {
+    map = new google.maps.Map(document.getElementById("map-container"), {
+        center: { lat: 53.9008985, lng: 27.5717368 },
+        zoom: 5,
+    });
+
+    // Добавляем клик **только после инициализации карты**
+    map.addListener("click", (event) => {
+        if (marker) marker.setMap(null);
+        marker = new google.maps.Marker({
+            position: event.latLng,
+            map: map,
+        });
+
+        // фиксируем большой размер карты
+        markerPlaced = true;
+        mapContainer.style.width = "533px";
+        mapContainer.style.height = "520px";
+        buttonContainer.style.top = "540px";
+        leaveButton.style.top = "610px";
+
+        // Убираем класс hoverable, чтобы больше не уменьшать карту
+        mapContainer.classList.remove("hoverable");
+    });
+}
+
+function calculateDistance() {
+    if (!marker) {
+        OpenMarkerPopup();
+        return;
+    }
+
+    const markerPosition = marker.getPosition();
+    const distance = google.maps.geometry.spherical.computeDistanceBetween(
+        new google.maps.LatLng(panoramaLocation),
+        markerPosition
+    ) / 1000;
+
+    const distanceInKm = distance.toFixed(2);
+
+    const maxDistance = 20000;
+    const score = Math.max(0, 5000 * (1 - Math.log(distance + 1) / Math.log(maxDistance + 1)));
+
+    document.getElementById("score").innerText = Math.round(score);
+    document.getElementById("location-name").innerText = panoramaLocation.name;
+    document.getElementById("distanceInKm").innerText = distanceInKm;
+
+    saveScore(score);
+    stopTimer();
+
+    // Показываем анимацию, а попап вызываем только после неё
+    showRealLocation(() => {
+        openPopup();
+    });
+}
+
+
+
+		
+		function TimeUp() {
+			document.getElementById('timeup').style.display = 'block';
+			document.getElementById('overlay').style.display = 'block';
+
+			document.querySelector("#timeup #score").innerText = "0";
+			document.querySelector("#timeup #location-name").innerText = panoramaLocation.name;
+			document.querySelector("#timeup #distanceInKm").innerText = "∞"; // Или оставить пустым
+		}
+        function openPopup() {
+            document.getElementById("popup").style.display = "block";
+            document.getElementById("overlay").style.display = "block";
+        }
+		function OpenMarkerPopup(){
+			document.getElementById('markerPopup').style.display = 'block';
+			document.getElementById('overlay').style.display = 'block';
+		}
+			
+function closePopup() {
+    document.getElementById("popup").style.display = "none";
+    document.getElementById("overlay").style.display = "none";
+    document.getElementById('timeup').style.display = 'none';
+
+    resetMap();          // сброс карты и маркеров
+    clearInterval(timerInterval);
+
+    timeLeft = 30;
+    startTimer();        // запускаем таймер заново
+
+    initPanorama();      // загружаем новую панораму
+
+    // 🔹 сброс размера карты и hover
+    markerPlaced = false;
+    mapContainer.classList.add("hoverable");
+    mapContainer.style.width = "287px";
+    mapContainer.style.height = "280px";
+    buttonContainer.style.top = "300px";
+    leaveButton.style.top = "370px";
+}
+
+
+		function closeMarkerPopup(){
+			document.getElementById('markerPopup').style.display = 'none';
+			document.getElementById('overlay').style.display = 'none'
+		}
+function resetMap() {
+    // Удаляем игровой маркер
+    if (marker) {
+        marker.setMap(null);
+        marker = null;
+    }
+
+    // Удаляем маркер реального места
+    if (realMarker) {
+        realMarker.setMap(null);
+        realMarker = null;
+    }
+
+    // Удаляем линию
+    if (lineBetween) {
+        lineBetween.setMap(null);
+        lineBetween = null;
+    }
+
+    // 🔥 ВОЗВРАЩАЕМ карту к исходному состоянию
+    map.setCenter({ lat: 53.9008985, lng: 27.5717368 }); // центр Беларуси / Минска
+    map.setZoom(5);                                       // твой исходный зум
+}
+
+
+
+
+        document.getElementById("calculate-distance").addEventListener("click", calculateDistance);
+		function saveScore(score) {
+			const locationKey = panoramaLocation.name; // Название текущей панорамы
+			let scores = JSON.parse(localStorage.getItem("scores")) || {};
+
+			if (!scores[locationKey]) {
+				scores[locationKey] = [];
+			}
+
+			scores[locationKey].push(Math.round(score));
+			scores[locationKey].sort((a, b) => b - a); // Сортируем по убыванию
+			scores[locationKey] = scores[locationKey].slice(0, 5); // Оставляем только топ-5
+
+			localStorage.setItem("scores", JSON.stringify(scores));
+
+			updateScoreboard(locationKey);
+		}
+
+		function updateScoreboard(locationKey) {
+			const scores = JSON.parse(localStorage.getItem("scores")) || {};
+			const scoreList = document.getElementById("score-list");
+
+			scoreList.innerHTML = ""; // Очищаем список
+
+			if (scores[locationKey]) {
+				scores[locationKey].forEach((score, index) => {
+				 	let listItem = document.createElement("div");
+					listItem.textContent = `${index + 1}. ${score} очков`;
+				 	scoreList.appendChild(listItem);
+				});
+			} else {
+				scoreList.innerHTML = "<li>Нет результатов</li>";
+			}
+		}
+
+		function displayTopScores() {
+			const topScores = JSON.parse(localStorage.getItem('topScores')) || [];
+			const scoreList = document.getElementById("score-list");
+			scoreList.innerHTML = '';
+
+    // Отображаем каждый элемент в списке с округленными очками
+			topScores.forEach((player, index) => {
+				const listItem = document.createElement("li");
+				listItem.textContent = `${index + 1}. ${player.name}: ${player.score} points`;
+				scoreList.appendChild(listItem);
+		});
+	}	
+
+
+function showRealLocation(callback) {
+    if (realMarker) realMarker.setMap(null);
+    if (lineBetween) lineBetween.setMap(null);
+
+    const playerPos = marker.getPosition();
+    const realPos = new google.maps.LatLng(panoramaLocation);
+
+    // Панорамируем к середине
+    const midLat = (playerPos.lat() + realPos.lat()) / 2;
+    const midLng = (playerPos.lng() + realPos.lng()) / 2;
+    const midPoint = new google.maps.LatLng(midLat, midLng);
+    map.panTo(midPoint);
+
+    // Подгоняем зум под оба маркера
+    setTimeout(() => {
+        const bounds = new google.maps.LatLngBounds();
+        bounds.extend(playerPos);
+        bounds.extend(realPos);
+        map.fitBounds(bounds, {
+    top: 50,
+    bottom: 50,
+    left: 50,
+    right: 50
+});
+    }, 400);
+
+    // Ставим зелёный маркер
+    setTimeout(() => {
+        realMarker = new google.maps.Marker({
+            position: realPos,
+            map: map,
+            animation: google.maps.Animation.DROP,
+            icon: { url: "http://maps.google.com/mapfiles/ms/icons/green-dot.png" }
+        });
+    }, 900);
+
+    // Анимируем линию
+    setTimeout(() => {
+        const path = [playerPos, playerPos];
+        lineBetween = new google.maps.Polyline({
+            path: path,
+            geodesic: true,
+            strokeColor: "#FF0000",
+            strokeOpacity: 1.0,
+            strokeWeight: 3,
+            map: map
+        });
+
+        const duration = 800;
+        const step = 20;
+        let progress = 0;
+
+        const interval = setInterval(() => {
+            progress += step;
+            const ratio = Math.min(progress / duration, 1);
+
+            const lat = playerPos.lat() + (realPos.lat() - playerPos.lat()) * ratio;
+            const lng = playerPos.lng() + (realPos.lng() - playerPos.lng()) * ratio;
+
+            lineBetween.setPath([
+                playerPos,
+                { lat, lng }
+            ]);
+
+            if (ratio >= 1) {
+                clearInterval(interval);
+                if (callback) callback(); // <-- вызываем коллбек в конце анимации
+            }
+        }, step);
+    }, 1400);
+}
+
+
+
+
+
+
+
+        window.onload = function () {
+            initPanorama();
+            initMap();
+			const mapContainer = document.getElementById("map-container");
+
+mapContainer.addEventListener("mouseenter", () => {
+    setTimeout(() => {
+        google.maps.event.trigger(map, "resize");
+    }, 310); // чуть больше, чем transition
+});
+
+mapContainer.addEventListener("mouseleave", () => {
+    setTimeout(() => {
+        google.maps.event.trigger(map, "resize");
+    }, 310);
+});
+			
+			
+			startTimer();
+			
+		
+        };
+		
+		
+		const mapContainer = document.getElementById("map-container");
+const buttonContainer = document.getElementById("button-container");
+const leaveButton = document.getElementById("leavebutton");
+let markerPlaced = false;
+
+// Класс hoverable добавляем, чтобы hover работал только до установки маркера
+mapContainer.classList.add("hoverable");
+
+// Обработчики hover
+mapContainer.addEventListener("mouseenter", () => {
+    if (!markerPlaced) {
+        mapContainer.style.width = "533px";
+        mapContainer.style.height = "520px";
+
+    }
+});
+mapContainer.addEventListener("mouseleave", () => {
+    if (!markerPlaced) {
+        mapContainer.style.width = "287px";
+        mapContainer.style.height = "280px";
+        buttonContainer.style.top = "300px";
+        leaveButton.style.top = "370px";
+    }
+});
+
+
+mapContainer.addEventListener("mouseenter", () => {
+    if (!markerPlaced) {
+	        buttonContainer.style.top = "540px";
+        leaveButton.style.top = "610px";
+        mapContainer.style.width = "533px";
+        mapContainer.style.height = "520px";
+    }
+});
+mapContainer.addEventListener("mouseleave", () => {
+    if (!markerPlaced) {
+        mapContainer.style.width = "287px";
+        mapContainer.style.height = "280px";
+    }
+});
+
+    </script>
+</body>
+</html>
