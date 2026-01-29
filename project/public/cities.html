@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -382,55 +383,37 @@ function initMap() {
     });
 }
 
-document.getElementById("calculate-distance").addEventListener("click", function() {
+function calculateDistance() {
     if (!marker) {
         OpenMarkerPopup();
         return;
     }
 
     const markerPosition = marker.getPosition();
+    const distance = google.maps.geometry.spherical.computeDistanceBetween(
+        new google.maps.LatLng(panoramaLocation),
+        markerPosition
+    ) / 1000;
 
-    if (isMultiplayer) {
-        if (myGuessSent) {
-            alert("Уже отправил угадывание!");
-            return;
-        }
+    const distanceInKm = distance.toFixed(2);
 
-        socket.emit('sendGuess', {
-            roomId: roomId,
-            lat: markerPosition.lat(),
-            lng: markerPosition.lng()
-        });
+    const maxDistance = 20000;
+    const score = Math.max(0, 5000 * (1 - Math.log(distance + 1) / Math.log(maxDistance + 1)));
 
-        myGuessSent = true;
-        // Можно показать "Ждём второго игрока..."
-        // document.getElementById("timer").innerText = "Ожидание...";
-    } else {
-        // ────────────────────────────────
-        // ОДИНОЧНАЯ ИГРА — здесь вся старая логика
-        // ────────────────────────────────
-        const distance = google.maps.geometry.spherical.computeDistanceBetween(
-            new google.maps.LatLng(panoramaLocation),
-            markerPosition
-        ) / 1000;
+    document.getElementById("score").innerText = Math.round(score);
+    document.getElementById("location-name").innerText = panoramaLocation.name;
+    document.getElementById("distanceInKm").innerText = distanceInKm;
 
-        const distanceInKm = distance.toFixed(2);
-        const maxDistance = 20000; // твоё максимальное расстояние
-        const score = Math.max(0, 5000 * (1 - Math.log(distance + 1) / Math.log(maxDistance + 1)));
+    saveScore(score);
+    stopTimer();
 
-        document.getElementById("score").innerText = Math.round(score);
-        document.getElementById("location-name").innerText = panoramaLocation.name;
-        document.getElementById("distanceInKm").innerText = distanceInKm;
+    // Показываем анимацию, а попап вызываем только после неё
+    showRealLocation(() => {
+        openPopup();
+    });
+}
 
-        saveScore(score);
-        stopTimer();
 
-        // Показываем анимацию → попап
-        showRealLocation(() => {
-            openPopup();
-        });
-    }
-});
 
 		
 		function TimeUp() {
@@ -635,7 +618,6 @@ function showRealLocation(callback) {
             initPanorama();
             initMap();
 			const mapContainer = document.getElementById("map-container");
-			
 
 mapContainer.addEventListener("mouseenter", () => {
     setTimeout(() => {
@@ -651,39 +633,7 @@ mapContainer.addEventListener("mouseleave", () => {
 			
 			
 			startTimer();
-			const socket = io();
-const urlParams = new URLSearchParams(window.location.search);
-const roomId = urlParams.get('room');
-const isMultiplayer = !!roomId;
-
-if (isMultiplayer) {
-  socket.emit('joinRoom', roomId); // Если нужно, но уже joined на сервере
-  // Слушаем события
-  socket.on('newRound', ({ round, location }) => {
-    currentLocation = { lat: location.lat, lng: location.lng }; // Подставь в твою логику
-    initPanorama();
-    startTimer();
-    resetMap();
-  });
-
-  socket.on('roundEnd', ({ realLocation, guesses, scores, distances }) => {
-    showRealLocation(); // Твоя функция
-    // Показ оппонента
-    const oppGuess = guesses[myPlayer === 'player1' ? 'player2' : 'player1'];
-    showOpponentMarker(oppGuess.lat, oppGuess.lng);
-    // Попап с очками
-    alert(`Твои очки: ${scores[myPlayer]}\nОппонент: ${scores[myPlayer === 'player1' ? 'player2' : 'player1']}`);
-  });
-
-  socket.on('gameEnd', (rounds) => {
-    // Финальный экран
-    alert('Игра окончена!');
-  });
-
-  socket.on('opponentDisconnected', () => {
-    alert('Оппонент вышел. Игра завершена.');
-  });
-}
+			
 		
         };
 		
@@ -731,10 +681,5 @@ mapContainer.addEventListener("mouseleave", () => {
 
     </script>
 </body>
-
 </html>
-
-
-
-
 
