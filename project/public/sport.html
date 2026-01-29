@@ -622,7 +622,39 @@ mapContainer.addEventListener("mouseleave", () => {
 			
 			
 			startTimer();
-			
+		const socket = io();
+const urlParams = new URLSearchParams(window.location.search);
+const roomId = urlParams.get('room');
+const isMultiplayer = !!roomId;
+
+if (isMultiplayer) {
+  socket.emit('joinRoom', roomId); // Если нужно, но уже joined на сервере
+  // Слушаем события
+  socket.on('newRound', ({ round, location }) => {
+    currentLocation = { lat: location.lat, lng: location.lng }; // Подставь в твою логику
+    initPanorama();
+    startTimer();
+    resetMap();
+  });
+
+  socket.on('roundEnd', ({ realLocation, guesses, scores, distances }) => {
+    showRealLocation(); // Твоя функция
+    // Показ оппонента
+    const oppGuess = guesses[myPlayer === 'player1' ? 'player2' : 'player1'];
+    showOpponentMarker(oppGuess.lat, oppGuess.lng);
+    // Попап с очками
+    alert(`Твои очки: ${scores[myPlayer]}\nОппонент: ${scores[myPlayer === 'player1' ? 'player2' : 'player1']}`);
+  });
+
+  socket.on('gameEnd', (rounds) => {
+    // Финальный экран
+    alert('Игра окончена!');
+  });
+
+  socket.on('opponentDisconnected', () => {
+    alert('Оппонент вышел. Игра завершена.');
+  });
+}
 		
         };
 		
@@ -670,4 +702,5 @@ mapContainer.addEventListener("mouseleave", () => {
 
     </script>
 </body>
+
 </html>
