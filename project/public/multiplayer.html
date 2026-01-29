@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BelGuessr — Парная игра</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { margin:0; font-family:Arial; background:#f4f4f9; color:#333; text-align:center; }
+        main { padding:60px 20px; }
+        .title { font-size:48px; margin-bottom:40px; }
+        .buttons { display:flex; flex-direction:column; align-items:center; gap:20px; }
+        button, select { padding:16px 32px; font-size:20px; border-radius:8px; border:none; cursor:pointer; }
+        button { background:#007bff; color:white; }
+        button:hover { background:#66CDAA; }
+        #status { margin-top:40px; font-size:24px; min-height:80px; }
+    </style>
+</head>
+<body>
+
+<main>
+    <div class="title">Парная игра</div>
+    <select id="mode">
+        <option value="cities">Города</option>
+        <option value="memory">Памятники</option>
+        <option value="museums">Музеи</option>
+        <option value="sport">Спорт</option>
+        <option value="study">ВУЗы</option>
+        <option value="countries">Деревни</option>
+    </select>
+    <button id="findGame">Найти игру</button>
+    <div id="status"></div>
+</main>
+
+<script>
+    const socket = io();  // Подключение к серверу
+
+    document.getElementById('findGame').onclick = () => {
+        const mode = document.getElementById('mode').value;
+        socket.emit('joinQueue', mode);
+        document.getElementById('status').textContent = 'Поиск оппонента...';
+    };
+
+    socket.on('status', msg => {
+        document.getElementById('status').textContent = msg;
+    });
+
+    socket.on('gameStart', ({ roomId, mode }) => {
+        window.location.href = `${mode}.html?room=${roomId}`;
+    });
+</script>
+</body>
+</html>
