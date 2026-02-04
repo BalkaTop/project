@@ -8,7 +8,7 @@ const io = new Server(server);
 
 app.use(express.static('public'));
 
-// Локации для режима cities (расширь по необходимости)
+// Локации для режима cities (все твои из cities.html)
 const locationsByMode = {
   cities: [
     { lat: 53.88042, lng: 27.4855477, name: 'Минск' },
@@ -21,14 +21,22 @@ const locationsByMode = {
     { lat: 54.1010124, lng: 28.3285245, name: 'Жодино' },
     { lat: 52.8163544, lng: 27.5591826, name: 'Солигорск' },
     { lat: 53.1319188, lng: 26.019032, name: 'Барановичи' },
-    // ... добавь остальные из твоего cities.html
+    { lat: 53.024559, lng: 27.5551262, name: 'Слуцк' },
+    { lat: 53.0655604, lng: 26.6419315, name: 'Клецк' },
+    { lat: 53.2225454, lng: 26.6887444, name: 'Несвиж' },
+    { lat: 53.142776, lng: 29.222351, name: 'Бобруйск' },
+    { lat: 53.0823829, lng: 30.0537977, name: 'Рогачев' },
+    { lat: 53.1524453, lng: 27.0908226, name: 'Копыль' }
   ],
   // Добавь другие режимы позже
 };
 
 function getRandomLocation(mode) {
   const locations = locationsByMode[mode] || [];
-  if (locations.length === 0) return { lat: 53.9, lng: 27.5667, name: 'Минск (заглушка)' };
+  if (locations.length === 0) {
+    console.warn(`Нет локаций для режима ${mode}, использую заглушку`);
+    return { lat: 53.9, lng: 27.5667, name: 'Минск (заглушка)' };
+  }
   return locations[Math.floor(Math.random() * locations.length)];
 }
 
@@ -44,12 +52,13 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 let queue = [];
-let rooms = {}; // roomId → { mode, players: [socketId1, socketId2], currentRound: 1, rounds: [], guesses: {}, timerTimeout: null }
+let rooms = {}; // roomId → { mode, players: [id1, id2], currentRound: 1, rounds: [], guesses: {}, timerTimeout: null }
 
 io.on('connection', socket => {
-  console.log('🟢 Player connected:', socket.id);
+  console.log('🟢 Подключился:', socket.id);
 
   socket.on('joinQueue', (mode) => {
+    console.log(`Игрок ${socket.id} ищет игру в режиме ${mode}`);
     queue.push({ socket, mode });
     socket.emit('status', 'Ожидание оппонента...');
 
@@ -72,6 +81,7 @@ io.on('connection', socket => {
       p1.socket.join(roomId);
       p2.socket.join(roomId);
 
+      console.log(`Создана комната ${roomId} для ${mode}`);
       io.to(roomId).emit('gameStart', { roomId, mode });
       startNewRound(roomId);
     }
@@ -85,21 +95,25 @@ io.on('connection', socket => {
     room.guesses[round] = room.guesses[round] || {};
     room.guesses[round][socket.id] = { lat, lng };
 
-    // Первый угадал → запускаем таймер 30 сек
+    console.log(`Угадывание от ${socket.id} в комнате ${roomId}, раунд ${round}`);
+
+    // Первый угадал → запускаем таймер
     if (Object.keys(room.guesses[round]).length === 1) {
+      console.log(`Первый угадал в раунде ${round} — запускаем таймер`);
       io.to(roomId).emit('startTimer');
       room.timerTimeout = setTimeout(() => endRound(roomId), 30000);
     }
 
-    // Оба угадали → завершаем раунд немедленно
+    // Оба угадали → завершаем сразу
     if (Object.keys(room.guesses[round]).length === 2) {
+      console.log(`Оба угадали в раунде ${round} — завершаем`);
       clearTimeout(room.timerTimeout);
       endRound(roomId);
     }
   });
 
   socket.on('disconnect', () => {
-    console.log('🔴 Player disconnected:', socket.id);
+    console.log('🔴 Отключился:', socket.id);
     queue = queue.filter(p => p.socket.id !== socket.id);
 
     for (const roomId in rooms) {
@@ -115,8 +129,11 @@ io.on('connection', socket => {
 function startNewRound(roomId) {
   const room = rooms[roomId];
   const location = getRandomLocation(room.mode);
+  console.log(`[${roomId}] Раунд ${room.currentRound}, локация: ${location.name} (${location.lat}, ${location.lng})`);
+
   room.rounds.push(location);
   room.guesses[room.currentRound] = {};
+
   io.to(roomId).emit('newRound', {
     round: room.currentRound,
     location: { lat: location.lat, lng: location.lng }
@@ -135,12 +152,17 @@ function endRound(roomId) {
   for (const playerId in guesses) {
     const g = guesses[playerId];
     const dist = calculateDistance(realPos.lat, realPos.lng, g.lat, g.lng);
-    const score = Math.max(0, 5000 - Math.floor(dist * 10)); // твоя формула, адаптируй
+    const score = Math.max(0, 5000 - Math.floor(dist * 10)); // адаптируй формулу под свою
     results[playerId] = { dist: Math.round(dist), score };
   }
 
   const playerIds = Object.keys(results);
-  const winner = results[playerIds[0]].score >= results[playerIds[1]].score ? playerIds[0] : playerIds[1];
+  let winner = null;
+  if (playerIds.length === 2) {
+    winner = results[playerIds[0]].score >= results[playerIds[1]].score ? playerIds[0] : playerIds[1];
+  }
+
+  console.log(`Раунд ${round} завершён. Победитель: ${winner}`);
 
   io.to(roomId).emit('roundEnd', {
     realLocation: realPos,
@@ -160,7 +182,12 @@ function endRound(roomId) {
         totalScores[pid] = (totalScores[pid] || 0) + res[pid].score;
       }
     }
-    const finalWinner = Object.keys(totalScores).reduce((a, b) => totalScores[a] > totalScores[b] ? a : b);
+    let finalWinner = null;
+    if (Object.keys(totalScores).length === 2) {
+      finalWinner = totalScores[Object.keys(totalScores)[0]] >= totalScores[Object.keys(totalScores)[1]] 
+        ? Object.keys(totalScores)[0] 
+        : Object.keys(totalScores)[1];
+    }
     io.to(roomId).emit('gameEnd', { totalScores, finalWinner });
     delete rooms[roomId];
   }
