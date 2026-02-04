@@ -12,6 +12,7 @@
             font-family: Arial, sans-serif;
             overflow: hidden;
             background-color: #f4f4f9;
+            height: 100vh;
         }
         #panorama {
             width: 100%;
@@ -144,6 +145,7 @@
             z-index: 12;
             display: none;
         }
+        #leavebutton { position: absolute; right: 75px; top: 490px; z-index: 11; }
     </style>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBGbr_QILBhKjlGn5KywwhRM4qZEYR3vXk&libraries=geometry"></script>
 </head>
@@ -241,8 +243,11 @@
         function initPanorama() {
             if (!panoramaLocation || !panoramaLocation.lat || !panoramaLocation.lng) {
                 console.error("Нет координат для панорамы!");
+                document.getElementById("panorama").innerHTML = "<div style='color:red; padding:20px; text-align:center;'>Нет панорамы</div>";
                 return;
             }
+
+            console.log("Инициализация панорамы:", panoramaLocation);
 
             if (panorama) {
                 panorama.setPosition({ lat: panoramaLocation.lat, lng: panoramaLocation.lng });
@@ -261,9 +266,10 @@
         }
 
         function initMap() {
+            console.log("Инициализация карты");
             const container = document.getElementById("map-container");
             if (!container) {
-                console.error("Контейнер карты не найден!");
+                console.error("Контейнер #map-container не найден!");
                 return;
             }
 
@@ -271,6 +277,8 @@
                 center: { lat: 53.9008985, lng: 27.5717368 },
                 zoom: 5,
             });
+
+            console.log("Карта создана");
 
             map.addListener("click", (event) => {
                 if (marker) marker.setMap(null);
@@ -288,7 +296,7 @@
             });
         }
 
-        // Hover-логика
+        // Hover
         const mapContainer = document.getElementById("map-container");
         const buttonContainer = document.getElementById("button-container");
         const leaveButton = document.getElementById("leavebutton");
@@ -314,7 +322,7 @@
             }
         });
 
-        // Кнопка Guess!
+        // Guess!
         document.getElementById("calculate-distance").addEventListener("click", function() {
             if (!marker) {
                 document.getElementById('markerPopup').style.display = 'block';
@@ -326,7 +334,7 @@
 
             if (isMultiplayer) {
                 if (myGuessSent) {
-                    alert("Уже отправил угадывание!");
+                    alert("Уже отправил!");
                     return;
                 }
 
@@ -338,7 +346,7 @@
 
                 myGuessSent = true;
                 document.getElementById("status-message").style.display = "block";
-                document.getElementById("status-message").textContent = "Ждём второго игрока...";
+                document.getElementById("status-message").textContent = "Ждём второго...";
             } else {
                 const distance = google.maps.geometry.spherical.computeDistanceBetween(
                     new google.maps.LatLng(panoramaLocation.lat, panoramaLocation.lng),
@@ -362,20 +370,24 @@
             }
         });
 
-        // Мультиплеер события
+        // Мультиплеер
         if (isMultiplayer) {
-            socket.on('startTimer', () => {
-                startTimer();
+            socket.on('gameStart', (data) => {
+                console.log("Игра началась, комната:", data.roomId);
             });
 
             socket.on('newRound', (data) => {
+                console.log("Новый раунд:", data);
                 panoramaLocation = { lat: data.location.lat, lng: data.location.lng };
-                mapContainer.style.display = "block"; // показываем карту
-                resetMap();
                 initPanorama();
                 document.getElementById("timer").style.display = "none";
                 myGuessSent = false;
                 document.getElementById("status-message").style.display = "none";
+            });
+
+            socket.on('startTimer', () => {
+                console.log("Сервер запустил таймер");
+                startTimer();
             });
 
             socket.on('roundEnd', (data) => {
@@ -411,7 +423,7 @@
                 } else if (data.totalScores[socket.id] < data.totalScores[Object.keys(data.totalScores).find(k => k !== socket.id)]) {
                     winnerText = "Победил оппонент!";
                 }
-                alert(`Игра окончена (5 раундов)!\n${winnerText}\nТвои очки: ${data.totalScores[socket.id]}\nОчки оппонента: ${data.totalScores[Object.keys(data.totalScores).find(k => k !== socket.id)]}`);
+                alert(`Игра окончена!\n${winnerText}\nТвои очки: ${data.totalScores[socket.id]}\nОчки оппонента: ${data.totalScores[Object.keys(data.totalScores).find(k => k !== socket.id)]}`);
             });
 
             socket.on('opponentDisconnected', () => {
@@ -422,7 +434,9 @@
 
         // Запуск
         window.onload = function () {
-            initMap(); // сначала карта
+            console.log("Страница загружена, isMultiplayer:", isMultiplayer);
+
+            initMap(); // карта первой
 
             if (!isMultiplayer) {
                 panoramaLocation = getRandomLocation();
@@ -430,16 +444,17 @@
                 startTimer();
             }
 
-            // Hover
+            // Resize при изменении окна
+            window.addEventListener('resize', () => {
+                if (map) google.maps.event.trigger(map, "resize");
+            });
+
+            // Hover resize
             mapContainer.addEventListener("mouseenter", () => {
-                if (!markerPlaced) {
-                    google.maps.event.trigger(map, "resize");
-                }
+                if (!markerPlaced) google.maps.event.trigger(map, "resize");
             });
             mapContainer.addEventListener("mouseleave", () => {
-                if (!markerPlaced) {
-                    google.maps.event.trigger(map, "resize");
-                }
+                if (!markerPlaced) google.maps.event.trigger(map, "resize");
             });
         };
     </script>
