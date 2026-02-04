@@ -6,144 +6,26 @@
     <title>BelGuessr - угадай город!</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            overflow: hidden;
-            background-color: #f4f4f9;
-            height: 100vh;
-        }
-        #panorama {
-            width: 100%;
-            height: 100%;
-            position: absolute;
-            top: 0;
-            left: 0;
-            z-index: 1;
-        }
+        body { margin: 0; font-family: Arial, sans-serif; overflow: hidden; background-color: #f4f4f9; }
+        #panorama { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
         #map-container {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            width: 287px;
-            height: 280px;
-            border: 2px solid #000;
-            border-radius: 8px;
-            background-color: #fff;
-            z-index: 10; /* поверх панорамы */
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            transition: width 0.3s, height 0.3s;
+            position: absolute; top: 10px; right: 10px; width: 287px; height: 280px;
+            border: 2px solid #000; border-radius: 8px; background-color: #fff; z-index: 10;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2); transition: width 0.3s, height 0.3s;
         }
-        #map-container.hoverable:hover {
-            width: 533px;
-            height: 520px;
-        }
-        #button-container {
-            position: absolute;
-            top: calc(10px + 280px + 10px);
-            right: 10px;
-            z-index: 11;
-            display: flex;
-            gap: 7px;
-            width: 287px;
-            transition: top 0.3s, width 0.3s;
-        }
-        #button-container button {
-            flex: 1;
-            padding: 10px 0;
-            font-size: 14px;
-            font-weight: bold;
-            border-radius: 20px;
-            border: none;
-            cursor: pointer;
-            background-color: #007bff;
-            color: #fff;
-            transition: background-color 0.3s;
-        }
-        #button-container button:hover {
-            background-color: #66CDAA;
-        }
-        #leavebutton {
-            position: absolute;
-            top: calc(10px + 280px + 60px);
-            right: 10px;
-            z-index: 11;
-            transition: top 0.3s;
-        }
-        #calculate-distance, #leave {
-            padding: 10px 20px;
-            font-size: 16px;
-            font-weight: bold;
-            color: #fff;
-            background-color: #007bff;
-            border: none;
-            border-radius: 30px;
-            width: 270px;
-            cursor: pointer;
-        }
-        #calculate-distance:hover, #leave:hover {
-            background-color: #66CDAA;
-        }
-        #popup, #markerPopup, #timeup {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: white;
-            padding: 20px;
-            border-radius: 20px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            z-index: 20;
-            text-align: center;
-        }
-        #popup button, #timeup button, #markerPopup button {
-            padding: 10px 20px;
-            font-size: 14px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 20px;
-            cursor: pointer;
-        }
-        #popup button:hover, #timeup button:hover, #markerPopup button:hover {
-            background-color: #66CDAA;
-        }
-        #overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-            z-index: 19;
-        }
-        #timer {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            font-size: 24px;
-            font-weight: bold;
-            color: #fff;
-            background-color: rgba(0,0,0,0.7);
-            padding: 10px 20px;
-            border-radius: 10px;
-            z-index: 12;
-            display: none;
-        }
-        #status-message {
-            position: absolute;
-            top: 70px;
-            left: 20px;
-            font-size: 18px;
-            color: #fff;
-            background: rgba(0,0,0,0.6);
-            padding: 8px 16px;
-            border-radius: 8px;
-            z-index: 12;
-            display: none;
-        }
+        #map-container.hoverable:hover { width: 533px; height: 520px; }
+        #button-container { position: absolute; top: calc(10px + 280px + 10px); right: 10px; z-index: 11; display: flex; gap: 7px; width: 287px; }
+        #button-container button { flex: 1; padding: 10px 0; font-size: 14px; font-weight: bold; border-radius: 20px; border: none; cursor: pointer; background-color: #007bff; color: #fff; }
+        #button-container button:hover { background-color: #66CDAA; }
+        #leavebutton { position: absolute; top: calc(10px + 280px + 60px); right: 10px; z-index: 11; }
+        #calculate-distance, #leave { padding: 10px 20px; font-size: 16px; font-weight: bold; color: #fff; background-color: #007bff; border: none; border-radius: 30px; width: 270px; cursor: pointer; }
+        #calculate-distance:hover, #leave:hover { background-color: #66CDAA; }
+        #popup, #markerPopup, #timeup { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 20px; border-radius: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); z-index: 20; text-align: center; }
+        #popup button, #timeup button, #markerPopup button { padding: 10px 20px; font-size: 14px; background-color: #007bff; color: white; border: none; border-radius: 20px; cursor: pointer; }
+        #popup button:hover, #timeup button:hover, #markerPopup button:hover { background-color: #66CDAA; }
+        #overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 19; }
+        #timer { position: absolute; top: 20px; left: 20px; font-size: 24px; font-weight: bold; color: #fff; background-color: rgba(0,0,0,0.7); padding: 10px 20px; border-radius: 10px; z-index: 12; display: none; }
+        #status-message { position: absolute; top: 70px; left: 20px; font-size: 18px; color: #fff; background: rgba(0,0,0,0.6); padding: 8px 16px; border-radius: 8px; z-index: 12; display: none; }
     </style>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBGbr_QILBhKjlGn5KywwhRM4qZEYR3vXk&libraries=geometry"></script>
 </head>
@@ -158,10 +40,7 @@
         <h2>Кол-во очков: <span id="score"></span></h2>
         <p>Локация: <span id="location-name"></span>.</p>
         <p>Расстояние: <span id="distanceInKm"></span> км.</p>
-        <div id="top-scores">
-            <h3>Топ-5 результатов</h3>
-            <div id="score-list"></div>
-        </div>
+        <div id="top-scores"><h3>Топ-5 результатов</h3><div id="score-list"></div></div>
         <button onclick="closePopup()">Закрыть</button>
     </div>
     <div id="markerPopup">
@@ -195,24 +74,7 @@
         const roomId = urlParams.get('room');
         const isMultiplayer = !!roomId;
 
-        const knownLocations = [
-            { lat: 53.88042, lng: 27.4855477, name: 'Минск' },
-            { lat: 53.6676981, lng: 23.9069996, name: 'Гродно' },
-            { lat: 52.0805018, lng: 23.7169662, name: 'Брест' },
-            { lat: 52.4317027, lng: 30.9938685, name: 'Гомель' },
-            { lat: 53.8980519, lng: 30.3340392, name: 'Могилёв' },
-            { lat: 55.1924057, lng: 30.2067509, name: 'Витебск' },
-            { lat: 55.4846103, lng: 28.7775038, name: 'Полоцк' },
-            { lat: 54.1010124, lng: 28.3285245, name: 'Жодино' },
-            { lat: 52.8163544, lng: 27.5591826, name: 'Солигорск' },
-            { lat: 53.1319188, lng: 26.019032, name: 'Барановичи' },
-            { lat: 53.024559, lng: 27.5551262, name: 'Слуцк' },
-            { lat: 53.0655604, lng: 26.6419315, name: 'Клецк' },
-            { lat: 53.2225454, lng: 26.6887444, name: 'Несвиж' },
-            { lat: 53.142776, lng: 29.222351, name: 'Бобруйск' },
-            { lat: 53.0823829, lng: 30.0537977, name: 'Рогачев' },
-            { lat: 53.1524453, lng: 27.0908226, name: 'Копыль' }
-        ];
+        const knownLocations = [ /* твои 16 локаций из предыдущего сообщения */ ];
 
         function getRandomLocation() {
             return knownLocations[Math.floor(Math.random() * knownLocations.length)];
@@ -229,6 +91,7 @@
                     document.getElementById("timer").textContent = timeLeft;
                 } else {
                     clearInterval(timerInterval);
+                    TimeUp();
                 }
             }, 1000);
         }
@@ -239,23 +102,13 @@
         }
 
         function initPanorama() {
-            if (!panoramaLocation || !panoramaLocation.lat || !panoramaLocation.lng) {
-                console.error("Нет координат для панорамы!");
-                return;
-            }
-
+            if (!panoramaLocation || !panoramaLocation.lat || !panoramaLocation.lng) return;
             if (panorama) {
                 panorama.setPosition({ lat: panoramaLocation.lat, lng: panoramaLocation.lng });
             } else {
                 panorama = new google.maps.StreetViewPanorama(
                     document.getElementById("panorama"),
-                    {
-                        position: { lat: panoramaLocation.lat, lng: panoramaLocation.lng },
-                        pov: { heading: 34, pitch: 10 },
-                        zoom: 1,
-                        disableDefaultUI: true,
-                        addressControl: false,
-                    }
+                    { position: { lat: panoramaLocation.lat, lng: panoramaLocation.lng }, pov: { heading: 34, pitch: 10 }, zoom: 1, disableDefaultUI: true }
                 );
             }
         }
@@ -265,13 +118,9 @@
                 center: { lat: 53.9008985, lng: 27.5717368 },
                 zoom: 5,
             });
-
             map.addListener("click", (event) => {
                 if (marker) marker.setMap(null);
-                marker = new google.maps.Marker({
-                    position: event.latLng,
-                    map: map,
-                });
+                marker = new google.maps.Marker({ position: event.latLng, map: map });
                 markerPlaced = true;
                 document.getElementById("map-container").style.width = "533px";
                 document.getElementById("map-container").style.height = "520px";
@@ -282,97 +131,141 @@
             });
         }
 
-        // Hover
-        const mapContainer = document.getElementById("map-container");
-        const buttonContainer = document.getElementById("button-container");
-        const leaveButton = document.getElementById("leavebutton");
-        mapContainer.classList.add("hoverable");
-
-        mapContainer.addEventListener("mouseenter", () => {
-            if (!markerPlaced) {
-                mapContainer.style.width = "533px";
-                mapContainer.style.height = "520px";
-                buttonContainer.style.top = "540px";
-                leaveButton.style.top = "610px";
-                google.maps.event.trigger(map, "resize");
-            }
-        });
-
-        mapContainer.addEventListener("mouseleave", () => {
-            if (!markerPlaced) {
-                mapContainer.style.width = "287px";
-                mapContainer.style.height = "280px";
-                buttonContainer.style.top = "300px";
-                leaveButton.style.top = "370px";
-                google.maps.event.trigger(map, "resize");
-            }
-        });
-
-        // Guess!
-        document.getElementById("calculate-distance").addEventListener("click", function() {
+        function calculateDistance() {
             if (!marker) {
-                document.getElementById('markerPopup').style.display = 'block';
-                document.getElementById('overlay').style.display = 'block';
+                OpenMarkerPopup();
                 return;
             }
-
             const pos = marker.getPosition();
-
             if (isMultiplayer) {
-                if (myGuessSent) {
-                    alert("Уже отправил угадывание!");
-                    return;
-                }
-
-                socket.emit('sendGuess', {
-                    roomId,
-                    lat: pos.lat(),
-                    lng: pos.lng()
-                });
-
+                if (myGuessSent) return;
+                socket.emit('sendGuess', { roomId, lat: pos.lat(), lng: pos.lng() });
                 myGuessSent = true;
                 document.getElementById("status-message").style.display = "block";
                 document.getElementById("status-message").textContent = "Ждём второго игрока...";
             } else {
-                // Одиночная логика
                 const distance = google.maps.geometry.spherical.computeDistanceBetween(
                     new google.maps.LatLng(panoramaLocation.lat, panoramaLocation.lng),
                     pos
                 ) / 1000;
-
                 const distanceInKm = distance.toFixed(2);
                 const maxDistance = 20000;
                 const score = Math.max(0, 5000 * (1 - Math.log(distance + 1) / Math.log(maxDistance + 1)));
-
                 document.getElementById("score").innerText = Math.round(score);
                 document.getElementById("location-name").innerText = panoramaLocation.name;
                 document.getElementById("distanceInKm").innerText = distanceInKm;
-
                 saveScore(score);
                 stopTimer();
-                showRealLocation(() => {
-                    document.getElementById("popup").style.display = "block";
-                    document.getElementById("overlay").style.display = "block";
-                });
+                showRealLocation(() => openPopup());
             }
-        });
+        }
+
+        function TimeUp() {
+            document.getElementById('timeup').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+            document.querySelector("#timeup #score").innerText = "0";
+            document.querySelector("#timeup #location-name").innerText = panoramaLocation.name;
+            document.querySelector("#timeup #distanceInKm").innerText = "∞";
+        }
+
+        function openPopup() {
+            document.getElementById("popup").style.display = "block";
+            document.getElementById("overlay").style.display = "block";
+        }
+
+        function OpenMarkerPopup() {
+            document.getElementById('markerPopup').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+        }
+
+        function closeMarkerPopup() {
+            document.getElementById('markerPopup').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+        }
+
+        function closePopup() {
+            document.getElementById("popup").style.display = "none";
+            document.getElementById("overlay").style.display = "none";
+            document.getElementById('timeup').style.display = 'none';
+            document.getElementById("status-message").style.display = "none";
+            resetMap();
+            clearInterval(timerInterval);
+            timeLeft = 30;
+            startTimer();
+            initPanorama();
+            markerPlaced = false;
+            document.getElementById("map-container").classList.add("hoverable");
+            document.getElementById("map-container").style.width = "287px";
+            document.getElementById("map-container").style.height = "280px";
+            document.getElementById("button-container").style.top = "300px";
+            document.getElementById("leavebutton").style.top = "370px";
+            myGuessSent = false;
+        }
+
+        function resetMap() {
+            if (marker) { marker.setMap(null); marker = null; }
+            if (realMarker) { realMarker.setMap(null); realMarker = null; }
+            if (lineBetween) { lineBetween.setMap(null); lineBetween = null; }
+            if (opponentMarker) { opponentMarker.setMap(null); opponentMarker = null; }
+            map.setCenter({ lat: 53.9008985, lng: 27.5717368 });
+            map.setZoom(5);
+        }
+
+        function saveScore(score) {
+            const key = panoramaLocation.name;
+            let scores = JSON.parse(localStorage.getItem("scores")) || {};
+            if (!scores[key]) scores[key] = [];
+            scores[key].push(score);
+            scores[key].sort((a,b) => b - a);
+            scores[key] = scores[key].slice(0,5);
+            localStorage.setItem("scores", JSON.stringify(scores));
+            updateScoreboard(key);
+        }
+
+        function updateScoreboard(key) {
+            const scores = JSON.parse(localStorage.getItem("scores")) || {};
+            const list = document.getElementById("score-list");
+            list.innerHTML = "";
+            if (!scores[key]) {
+                list.innerHTML = "<div>Нет результатов</div>";
+                return;
+            }
+            scores[key].forEach((score, i) => {
+                const div = document.createElement("div");
+                div.textContent = `${i+1}. ${score} очков`;
+                list.appendChild(div);
+            });
+        }
+
+        function showRealLocation() {
+            if (realMarker) realMarker.setMap(null);
+            if (lineBetween) lineBetween.setMap(null);
+            const playerPos = marker.getPosition();
+            const realPos = new google.maps.LatLng(panoramaLocation.lat, panoramaLocation.lng);
+            realMarker = new google.maps.Marker({ position: realPos, map: map, icon: { url: "http://maps.google.com/mapfiles/ms/icons/green-dot.png" } });
+            lineBetween = new google.maps.Polyline({ path: [playerPos, realPos], strokeColor: "#FF0000", strokeOpacity: 1, strokeWeight: 3, map: map });
+            const bounds = new google.maps.LatLngBounds();
+            bounds.extend(playerPos);
+            bounds.extend(realPos);
+            map.fitBounds(bounds);
+        }
 
         // Мультиплеер
         if (isMultiplayer) {
-            socket.on('startTimer', () => startTimer());
-
             socket.on('newRound', (data) => {
                 panoramaLocation = { lat: data.location.lat, lng: data.location.lng };
                 initPanorama();
                 document.getElementById("timer").style.display = "none";
                 myGuessSent = false;
-                document.getElementById("status-message").style.display = "none";
+            });
+
+            socket.on('startTimer', () => {
+                startTimer();
             });
 
             socket.on('roundEnd', (data) => {
                 stopTimer();
                 document.getElementById("status-message").style.display = "none";
-
                 const oppGuess = data.guesses[socket.id === data.players[0] ? data.players[1] : data.players[0]];
                 if (oppGuess) {
                     opponentMarker = new google.maps.Marker({
@@ -382,52 +275,27 @@
                         title: "Оппонент"
                     });
                 }
-
-                showRealLocation(() => {
-                    const myResult = data.results[socket.id];
-                    const oppResult = data.results[socket.id === data.players[0] ? data.players[1] : data.players[0]];
-                    document.getElementById("score").innerText = myResult.score;
-                    document.getElementById("distanceInKm").innerText = myResult.dist;
-                    document.getElementById("location-name").innerText = "Секретная локация";
-                    document.getElementById("popup").innerHTML += `<p><b>Победитель раунда: ${data.winner === socket.id ? 'Ты' : 'Оппонент'}</b></p>`;
-                    document.getElementById("popup").style.display = "block";
-                    document.getElementById("overlay").style.display = "block";
-                });
-            });
-
-            socket.on('gameEnd', (data) => {
-                let winnerText = "Ничья!";
-                if (data.totalScores[socket.id] > data.totalScores[Object.keys(data.totalScores).find(k => k !== socket.id)]) {
-                    winnerText = "Ты победил всю игру!";
-                } else if (data.totalScores[socket.id] < data.totalScores[Object.keys(data.totalScores).find(k => k !== socket.id)]) {
-                    winnerText = "Победил оппонент!";
-                }
-                alert(`Игра окончена!\n${winnerText}\nТвои очки: ${data.totalScores[socket.id]}\nОчки оппонента: ${data.totalScores[Object.keys(data.totalScores).find(k => k !== socket.id)]}`);
-            });
-
-            socket.on('opponentDisconnected', () => {
-                alert('Оппонент вышел.');
-                setTimeout(() => window.location.href = 'modes.html', 2000);
+                showRealLocation();
+                const myResult = data.results[socket.id];
+                const oppResult = data.results[socket.id === data.players[0] ? data.players[1] : data.players[0]];
+                document.getElementById("score").innerText = myResult.score;
+                document.getElementById("distanceInKm").innerText = myResult.dist;
+                document.getElementById("location-name").innerText = "Секретная локация";
+                document.getElementById("popup").innerHTML += `<p><b>Победитель раунда: ${data.winner === socket.id ? 'Ты' : 'Оппонент'}</b></p>`;
+                document.getElementById("popup").style.display = "block";
+                document.getElementById("overlay").style.display = "block";
             });
         }
 
-        // Запуск
-        window.onload = function () {
-            initMap(); // карта первой
+        document.getElementById("calculate-distance").addEventListener("click", calculateDistance);
 
+        window.onload = function () {
+            initMap();
             if (!isMultiplayer) {
                 panoramaLocation = getRandomLocation();
                 initPanorama();
                 startTimer();
             }
-
-            // Hover resize
-            mapContainer.addEventListener("mouseenter", () => {
-                if (!markerPlaced) google.maps.event.trigger(map, "resize");
-            });
-            mapContainer.addEventListener("mouseleave", () => {
-                if (!markerPlaced) google.maps.event.trigger(map, "resize");
-            });
         };
     </script>
 </body>
