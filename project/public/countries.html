@@ -1,10 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BelGuessr - угадай деревню!</title>
+
+    <!-- Socket.io для мультиплеера -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
     <style>
         body {
             margin: 0;
@@ -12,9 +15,6 @@
             overflow: hidden;
             background-color: #f4f4f9;
         }
-
-        /* ─────────────────────── MAP CONTAINER ─────────────────────── */
-
         #map-container {
             float: right;
             position: absolute;
@@ -29,15 +29,10 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
             transition: width 0.3s, height 0.3s;
         }
-
-        /* Hover — только пока маркер не поставлен */
         #map-container.hoverable:hover {
             width: 533px;
             height: 520px;
         }
-
-        /* ─────────────────────── BUTTONS ─────────────────────── */
-
         #button-container {
             position: absolute;
             top: calc(10px + 280px + 10px);
@@ -48,7 +43,6 @@
             z-index: 2;
             transition: top 0.3s, width 0.3s;
         }
-
         #button-container button {
             flex: 1;
             padding: 10px 0;
@@ -61,11 +55,9 @@
             cursor: pointer;
             transition: background-color 0.3s;
         }
-
         #button-container button:hover {
             background-color: #66CDAA;
         }
-
         #leavebutton {
             position: absolute;
             top: calc(10px + 280px + 60px);
@@ -73,7 +65,6 @@
             z-index: 2;
             transition: top 0.3s;
         }
-
         #leave {
             padding: 10px 20px;
             font-size: 16px;
@@ -86,9 +77,6 @@
             cursor: pointer;
         }
         #leave:hover { background-color: #66CDAA; }
-
-        /* ─────────────────────── POPUPS ─────────────────────── */
-
         #popup, #markerPopup, #timeup {
             display: none;
             position: fixed;
@@ -102,7 +90,6 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
             z-index: 10;
         }
-
         #popup button, #markerPopup button, #timeup button {
             padding: 10px 20px;
             font-size: 14px;
@@ -115,7 +102,6 @@
         #popup button:hover, #markerPopup button:hover, #timeup button:hover {
             background-color: #66CDAA;
         }
-
         #overlay {
             display: none;
             position: fixed;
@@ -126,9 +112,6 @@
             background-color: rgba(0,0,0,0.5);
             z-index: 5;
         }
-
-        /* ─────────────────────── TIMER ─────────────────────── */
-
         #timer {
             position: absolute;
             top: 20px;
@@ -141,9 +124,18 @@
             border-radius: 10px;
             z-index: 10;
         }
-
-        /* PANORAMA */
-
+        #status-message {
+            position: absolute;
+            top: 70px;
+            left: 20px;
+            font-size: 18px;
+            color: #fff;
+            background: rgba(0,0,0,0.6);
+            padding: 8px 16px;
+            border-radius: 8px;
+            z-index: 10;
+            display: none;
+        }
         #panorama-container {
             width: 100%;
             height: 100vh;
@@ -157,29 +149,18 @@
             height: 100%;
             border: none;
         }
-
     </style>
-
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBGbr_QILBhKjlGn5KywwhRM4qZEYR3vXk&libraries=geometry"></script>
-
 </head>
 <body>
-
-    <!-- MAP -->
     <div id="map-container" class="hoverable"></div>
-
-    <!-- BUTTONS -->
     <div id="button-container">
         <button id="calculate-distance">Guess!</button>
         <button id="leave" onclick="window.location.href='index.html'">Выйти</button>
     </div>
-
-    <!-- PANORAMA -->
-    <div id="panorama-container" style="margin-top:-60px; height:116%">
+    <div id="panorama-container">
         <iframe id="panorama-iframe" src="" frameborder="0"></iframe>
     </div>
-
-    <!-- POPUPS -->
     <div id="popup">
         <h2>Кол-во очков: <span id="score"></span></h2>
         <p>Локация: <span id="location-name"></span>.</p>
@@ -190,12 +171,10 @@
         </div>
         <button onclick="closePopup()">Закрыть</button>
     </div>
-
     <div id="markerPopup">
         <p>Пожалуйста, установите маркер на карте</p>
         <button onclick="closeMarkerPopup()">Закрыть</button>
     </div>
-
     <div id="timeup">
         <h2>Время вышло!</h2>
         <h2>Кол-во очков: <span id="score"></span></h2>
@@ -203,358 +182,395 @@
         <p>Расстояние: <span id="distanceInKm"></span> км.</p>
         <button onclick="closePopup()">Закрыть</button>
     </div>
-
     <div id="timer">30</div>
+    <div id="status-message"></div>
     <div id="overlay"></div>
 
-<script>
+    <script>
+        let map, marker;
+        let realMarker = null;
+        let lineBetween = null;
+        let opponentMarker = null; // маркер оппонента в мультиплеере
+        let currentLocation;
+        let timeLeft = 30;
+        let timerInterval;
+        let markerPlaced = false;
+        let myGuessSent = false;
 
-let map, marker;
-let realMarker = null;
-let lineBetween = null;
+        // Socket.io + мультиплеер
+        const socket = io();
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomId = urlParams.get('room');
+        const isMultiplayer = !!roomId;
 
-let currentLocation;
-let timeLeft = 30;
-let timerInterval;
-
-let markerPlaced = false;
-
-const mapContainer = document.getElementById("map-container");
-const buttonContainer = document.getElementById("button-container");
-const leaveButton = document.getElementById("leavebutton");
-
-
- const panoramaLocations = [
-            { 
-                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/perednij-dvor-zaostrovechskoj-srednej-shkoly-panorama49618", 
-                lat: 52.898533, 
+        const panoramaLocations = [
+            {
+                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/perednij-dvor-zaostrovechskoj-srednej-shkoly-panorama49618",
+                lat: 52.898533,
                 lng: 26.772175,
-                name: "Передний двор Заостровечской средней школы" 
+                name: "Передний двор Заостровечской средней школы"
             },
-            { 
-                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/xram-svyashhennomuchenika-dionisiya-areopagita-panorama49611", 
-                lat: 52.899669, // Замените на реальные координаты
-                lng: 26.776613, // Замените на реальные координаты
-                name: "Храм священномученика Дионисия Ареопагита" 
+            {
+                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/xram-svyashhennomuchenika-dionisiya-areopagita-panorama49611",
+                lat: 52.899669,
+                lng: 26.776613,
+                name: "Храм священномученика Дионисия Ареопагита"
             },
-            { 
-                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/ul-lenina-pmu-xominka-panorama49610", 
-                lat: 52.893592, // Замените на реальные координаты
-                lng: 26.775214, // Замените на реальные координаты
-                name: "Ул. Ленина, ПМУ Хоминка" 
-            }, 
-			{ 
-                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/detskij-sad-ag-zaostroveche-panorama49599", 
-                lat: 52.892455, // Замените на реальные координаты
-                lng: 26.780151, // Замените на реальные координаты
-                name: "Заостровечский ясли-сад" 
+            {
+                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/ul-lenina-pmu-xominka-panorama49610",
+                lat: 52.893592,
+                lng: 26.775214,
+                name: "Ул. Ленина, ПМУ Хоминка"
             },
-			{ 
-                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/ul-pervomajskaya-panorama49576", 
-                lat: 52.901802, // Замените на реальные координаты
-                lng: 26.787348, // Замените на реальные координаты
-                name: "Улица Первомайская" 
+            {
+                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/detskij-sad-ag-zaostroveche-panorama49599",
+                lat: 52.892455,
+                lng: 26.780151,
+                name: "Заостровечский ясли-сад"
             },
-			{ 
-                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/ul-polesskaya-oginskogo-panorama49585", 
-                lat: 52.900461, // Замените на реальные координаты
-                lng: 26.780814, // Замените на реальные координаты
-                name: "Улица Полесская" 
+            {
+                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/ul-pervomajskaya-panorama49576",
+                lat: 52.901802,
+                lng: 26.787348,
+                name: "Улица Первомайская"
             },
-			{ 
-                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/istoriko-etnograficheskij-muzej-ag-zaostroveche-panorama49560", 
-                lat: 52.898283, // Замените на реальные координаты
-                lng: 26.776198, // Замените на реальные координаты
-                name: "Историко-этнографический музей" 
+            {
+                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/ul-polesskaya-oginskogo-panorama49585",
+                lat: 52.900461,
+                lng: 26.780814,
+                name: "Улица Полесская"
             },
-			{ 
-                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/rechka-lan-panorama49557", 
-                lat: 52.905582, // Замените на реальные координаты
-                lng: 26.745489, // Замените на реальные координаты
-                name: "Река Лань" 
+            {
+                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/istoriko-etnograficheskij-muzej-ag-zaostroveche-panorama49560",
+                lat: 52.898283,
+                lng: 26.776198,
+                name: "Историко-этнографический музей"
             },
-			{ 
-                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/ul-rechnaya-panorama49497", 
-                lat: 52.907780, // Замените на реальные координаты
-                lng: 26.760713, // Замените на реальные координаты
-                name: "Улица Речная" 
+            {
+                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/rechka-lan-panorama49557",
+                lat: 52.905582,
+                lng: 26.745489,
+                name: "Река Лань"
             },
-			{ 
-                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/belarusbank-panorama49427", 
-                lat: 52.892083, // Замените на реальные координаты
-                lng: 26.779607, // Замените на реальные координаты
-                name: "Беларусбанк" 
+            {
+                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/ul-rechnaya-panorama49497",
+                lat: 52.907780,
+                lng: 26.760713,
+                name: "Улица Речная"
+            },
+            {
+                url: "https://1panorama.ru/world/belarus-9/minskaya-55/agzaostroveche-3259/belarusbank-panorama49427",
+                lat: 52.892083,
+                lng: 26.779607,
+                name: "Беларусбанк"
             }
         ];
 
-/* ────────────────────────── TIMER ────────────────────────── */
-
-function startTimer() {
-    clearInterval(timerInterval);
-    document.getElementById("timer").textContent = timeLeft;
-    timerInterval = setInterval(() => {
-        if (timeLeft > 0) {
-            timeLeft--;
-            document.getElementById("timer").textContent = timeLeft;
-        } else {
-            clearInterval(timerInterval);
-            TimeUp();
+        function getRandomLocation() {
+            return panoramaLocations[Math.floor(Math.random() * panoramaLocations.length)];
         }
-    }, 1000);
-}
 
-function stopTimer() { clearInterval(timerInterval); }
+        function startTimer() {
+            clearInterval(timerInterval);
+            document.getElementById("timer").textContent = timeLeft;
+            timerInterval = setInterval(() => {
+                if (timeLeft > 0) {
+                    timeLeft--;
+                    document.getElementById("timer").textContent = timeLeft;
+                } else {
+                    clearInterval(timerInterval);
+                    TimeUp();
+                }
+            }, 1000);
+        }
 
-/* ────────────────────────── PANORAMA ────────────────────────── */
+        function stopTimer() {
+            clearInterval(timerInterval);
+        }
 
-function getRandomLocation() {
-    return panoramaLocations[Math.floor(Math.random() * panoramaLocations.length)];
-}
+        function initPanorama() {
+            currentLocation = getRandomLocation();
+            document.getElementById("panorama-iframe").src = currentLocation.url;
+            updateScoreboard(currentLocation.name);
+        }
 
-function initPanorama() {
-    currentLocation = getRandomLocation();
-    document.getElementById("panorama-iframe").src = currentLocation.url;
-    updateScoreboard(currentLocation.name);
-}
+        function initMap() {
+            map = new google.maps.Map(document.getElementById("map-container"), {
+                center: { lat: 54.6, lng: 27.0 },
+                zoom: 5,
+            });
 
-/* ────────────────────────── MAP ────────────────────────── */
+            map.addListener("click", (event) => {
+                if (marker) marker.setMap(null);
+                marker = new google.maps.Marker({
+                    position: event.latLng,
+                    map: map,
+                });
+                markerPlaced = true;
+                mapContainer.classList.remove("hoverable");
+                mapContainer.style.width = "533px";
+                mapContainer.style.height = "520px";
+                buttonContainer.style.top = "540px";
+            });
+        }
 
-function initMap() {
-    map = new google.maps.Map(document.getElementById("map-container"), {
-        center: { lat: 54.6, lng: 27.0 },
-        zoom: 5,
-    });
-
-    map.addListener("click", (event) => {
-        if (marker) marker.setMap(null);
-
-        marker = new google.maps.Marker({
-            position: event.latLng,
-            map: map,
+        // Hover эффект (оставлен как был)
+        mapContainer.addEventListener("mouseenter", () => {
+            if (!markerPlaced) {
+                mapContainer.style.width = "533px";
+                mapContainer.style.height = "520px";
+                buttonContainer.style.top = "540px";
+            }
+        });
+        mapContainer.addEventListener("mouseleave", () => {
+            if (!markerPlaced) {
+                mapContainer.style.width = "410px";
+                mapContainer.style.height = "340px";
+                buttonContainer.style.top = "300px";
+            }
         });
 
-        markerPlaced = true;
+        // ──────────────────────────────────────────────
+        // Кнопка "Guess!"
+        // ──────────────────────────────────────────────
+        document.getElementById("calculate-distance").addEventListener("click", function() {
+            if (!marker) {
+                OpenMarkerPopup();
+                return;
+            }
 
-        // фиксируем карту
-        mapContainer.classList.remove("hoverable");
-        mapContainer.style.width = "533px";
-        mapContainer.style.height = "520px";
+            const playerPos = marker.getPosition();
 
-        buttonContainer.style.top = "540px";
-    });
-}
+            if (isMultiplayer) {
+                if (myGuessSent) {
+                    alert("Уже отправил угадывание!");
+                    return;
+                }
 
-/* ────────────────────────── HOVER EFFECT ────────────────────────── */
+                socket.emit('sendGuess', {
+                    roomId: roomId,
+                    lat: playerPos.lat(),
+                    lng: playerPos.lng()
+                });
 
-mapContainer.addEventListener("mouseenter", () => {
-    if (!markerPlaced) {
-        mapContainer.style.width = "533px";
-        mapContainer.style.height = "520px";
-        buttonContainer.style.top = "540px";
-    }
-});
+                myGuessSent = true;
+                document.getElementById("status-message").style.display = "block";
+                document.getElementById("status-message").textContent = "Ждём второго игрока...";
+            } else {
+                // Одиночная игра — твоя старая логика
+                const realPos = new google.maps.LatLng(currentLocation.lat, currentLocation.lng);
+                const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                    realPos,
+                    playerPos
+                ) / 1000;
 
-mapContainer.addEventListener("mouseleave", () => {
-    if (!markerPlaced) {
-        mapContainer.style.width = "410px";
-        mapContainer.style.height = "340px";
-        buttonContainer.style.top = "300px";
-    }
-});
+                const distanceInKm = distance.toFixed(2);
+                const maxDistance = 20000;
+                const score = Math.max(0, 5000 * (1 - Math.log(distance + 1) / Math.log(maxDistance + 1)));
+                const roundedScore = Math.round(score);
 
-/* ────────────────────────── DISTANCE ────────────────────────── */
+                document.getElementById("score").innerText = roundedScore;
+                document.getElementById("location-name").innerText = currentLocation.name;
+                document.getElementById("distanceInKm").innerText = distanceInKm;
 
-function calculateDistance() {
-    if (!marker) {
-        OpenMarkerPopup();
-        return;
-    }
+                saveScore(roundedScore);
+                stopTimer();
 
-    const playerPos = marker.getPosition();
-    const realPos = new google.maps.LatLng(currentLocation.lat, currentLocation.lng);
+                showRealLocation(playerPos, realPos);
+                setTimeout(() => { openPopup(); }, 1500);
+            }
+        });
 
-    const distance = google.maps.geometry.spherical.computeDistanceBetween(
-        realPos,
-        playerPos
-    ) / 1000;
+        function TimeUp() {
+            document.getElementById("timeup").style.display = "block";
+            document.getElementById("overlay").style.display = "block";
+            document.querySelector("#timeup #score").innerText = "0";
+            document.querySelector("#timeup #location-name").innerText = currentLocation.name;
+            document.querySelector("#timeup #distanceInKm").innerText = "∞";
+        }
 
-    const distanceInKm = distance.toFixed(2);
-    const maxDistance = 20000;
-    const score = Math.max(0, 5000 * (1 - Math.log(distance + 1) / Math.log(maxDistance + 1)));
-    const roundedScore = Math.round(score);
+        function openPopup() {
+            document.getElementById("popup").style.display = "block";
+            document.getElementById("overlay").style.display = "block";
+        }
 
-    document.getElementById("score").innerText = roundedScore;
-    document.getElementById("location-name").innerText = currentLocation.name;
-    document.getElementById("distanceInKm").innerText = distanceInKm;
+        function OpenMarkerPopup() {
+            document.getElementById("markerPopup").style.display = "block";
+            document.getElementById("overlay").style.display = "block";
+        }
 
-    saveScore(roundedScore);
+        function closeMarkerPopup() {
+            document.getElementById("markerPopup").style.display = "none";
+            document.getElementById("overlay").style.display = "none";
+        }
 
-    stopTimer();
+        function closePopup() {
+            document.getElementById("popup").style.display = "none";
+            document.getElementById("overlay").style.display = "none";
+            document.getElementById("timeup").style.display = "none";
+            document.getElementById("status-message").style.display = "none";
 
-    showRealLocation(playerPos, realPos); // зелёный маркер + линия
+            resetMap();
+            timeLeft = 30;
+            startTimer();
+            initPanorama();
+            markerPlaced = false;
+            mapContainer.classList.add("hoverable");
+            mapContainer.style.width = "410px";
+            mapContainer.style.height = "340px";
+            buttonContainer.style.top = "300px";
 
-    setTimeout(() => { openPopup(); }, 1500);
-}
+            myGuessSent = false;
+        }
 
-/* ────────────────────────── SHOW REAL LOCATION ────────────────────────── */
+        function resetMap() {
+            if (marker) { marker.setMap(null); marker = null; }
+            if (realMarker) { realMarker.setMap(null); realMarker = null; }
+            if (lineBetween) { lineBetween.setMap(null); lineBetween = null; }
+            if (opponentMarker) { opponentMarker.setMap(null); opponentMarker = null; }
 
-function showRealLocation(playerPos, realPos) {
+            map.setCenter({ lat: 54.6, lng: 27.0 });
+            map.setZoom(5);
+        }
 
-    if (realMarker) realMarker.setMap(null);
-    if (lineBetween) lineBetween.setMap(null);
+        function saveScore(score) {
+            const key = currentLocation.name;
+            let scores = JSON.parse(localStorage.getItem("scores")) || {};
+            if (!scores[key]) scores[key] = [];
+            scores[key].push(score);
+            scores[key].sort((a,b) => b - a);
+            scores[key] = scores[key].slice(0,5);
+            localStorage.setItem("scores", JSON.stringify(scores));
+            updateScoreboard(key);
+        }
 
-    realMarker = new google.maps.Marker({
-        position: realPos,
-        map: map,
-        icon: { url: "http://maps.google.com/mapfiles/ms/icons/green-dot.png" }
-    });
+        function updateScoreboard(key) {
+            const scores = JSON.parse(localStorage.getItem("scores")) || {};
+            const list = document.getElementById("score-list");
+            list.innerHTML = "";
+            if (!scores[key]) {
+                list.innerHTML = "<div>Нет результатов</div>";
+                return;
+            }
+            scores[key].forEach((score, i) => {
+                const div = document.createElement("div");
+                div.textContent = `${i+1}. ${score} очков`;
+                list.appendChild(div);
+            });
+        }
 
-    lineBetween = new google.maps.Polyline({
-        path: [playerPos, realPos],
-        strokeColor: "#FF0000",
-        strokeOpacity: 1.0,
-        strokeWeight: 3,
-        map: map
-    });
+        function showRealLocation(playerPos, realPos) {
+            if (realMarker) realMarker.setMap(null);
+            if (lineBetween) lineBetween.setMap(null);
 
-    const bounds = new google.maps.LatLngBounds();
-    bounds.extend(playerPos);
-    bounds.extend(realPos);
-    map.fitBounds(bounds);
-}
+            realMarker = new google.maps.Marker({
+                position: realPos,
+                map: map,
+                icon: { url: "http://maps.google.com/mapfiles/ms/icons/green-dot.png" }
+            });
 
-/* ────────────────────────── POPUPS ────────────────────────── */
+            // Показываем линию (если хочешь — можно добавить анимацию, как в cities)
+            lineBetween = new google.maps.Polyline({
+                path: [playerPos, realPos],
+                strokeColor: "#FF0000",
+                strokeOpacity: 1.0,
+                strokeWeight: 3,
+                map: map
+            });
 
-function openPopup() {
-    document.getElementById("popup").style.display = "block";
-    document.getElementById("overlay").style.display = "block";
-}
-function OpenMarkerPopup(){
-    document.getElementById("markerPopup").style.display = "block";
-    document.getElementById("overlay").style.display = "block";
-}
-function closeMarkerPopup(){
-    document.getElementById("markerPopup").style.display = "none";
-    document.getElementById("overlay").style.display = "none";
-}
+            const bounds = new google.maps.LatLngBounds();
+            bounds.extend(playerPos);
+            bounds.extend(realPos);
+            map.fitBounds(bounds);
+        }
 
-function closePopup() {
-    document.getElementById("popup").style.display = "none";
-    document.getElementById("overlay").style.display = "none";
-    document.getElementById("timeup").style.display = "none";
+        // ──────────────────────────────────────────────
+        // Мультиплеер: события от сервера
+        // ──────────────────────────────────────────────
+        if (isMultiplayer) {
+            socket.on('newRound', (data) => {
+                // Сервер прислал новую локацию
+                currentLocation = {
+                    url: data.url,
+                    lat: data.lat,
+                    lng: data.lng,
+                    name: data.name || "Секретная локация"
+                };
+                document.getElementById("panorama-iframe").src = currentLocation.url;
+                resetMap();
+                startTimer();
+                myGuessSent = false;
+                document.getElementById("status-message").style.display = "none";
+                document.getElementById("timer").textContent = "30";
+            });
 
-    resetMap();
+            socket.on('roundEnd', (data) => {
+                document.getElementById("status-message").style.display = "none";
 
-    timeLeft = 30;
-    startTimer();
-    initPanorama();
+                // Показываем маркер оппонента (синий)
+                const oppGuess = data.guesses[socket.id === data.player1 ? 'player2' : 'player1'];
+                if (oppGuess) {
+                    opponentMarker = new google.maps.Marker({
+                        position: { lat: oppGuess.lat, lng: oppGuess.lng },
+                        map: map,
+                        icon: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+                        title: "Оппонент"
+                    });
+                }
 
-    markerPlaced = false;
+                // Показываем настоящую локацию и попап с результатами
+                const realPos = new google.maps.LatLng(currentLocation.lat, currentLocation.lng);
+                showRealLocation(marker.getPosition(), realPos);
 
-    mapContainer.classList.add("hoverable");
-    mapContainer.style.width = "410px";
-    mapContainer.style.height = "340px";
-    buttonContainer.style.top = "300px";
-}
+                const myDist = data.distances[socket.id];
+                const oppDist = data.distances[socket.id === data.player1 ? data.player2 : data.player1];
+                const myScore = Math.round(Math.max(0, 5000 * (1 - Math.log(myDist + 1) / Math.log(20000 + 1))));
+                const oppScore = Math.round(Math.max(0, 5000 * (1 - Math.log(oppDist + 1) / Math.log(20000 + 1))));
 
-function TimeUp() {
-    document.getElementById("timeup").style.display = "block";
-    document.getElementById("overlay").style.display = "block";
-    document.querySelector("#timeup #score").innerText = "0";
-    document.querySelector("#timeup #location-name").innerText = currentLocation.name;
-    document.querySelector("#timeup #distanceInKm").innerText = "∞";
-}
+                document.getElementById("score").innerText = myScore;
+                document.getElementById("location-name").innerText = currentLocation.name;
+                document.getElementById("distanceInKm").innerText = Math.round(myDist);
+                openPopup(); // показываем попап с твоими результатами
 
-/* ────────────────────────── RESET MAP ────────────────────────── */
+                // Можно добавить в попап строку про оппонента
+                // Например: document.getElementById("popup").innerHTML += `<p>Оппонент: ${oppScore} очков (${Math.round(oppDist)} км)</p>`;
+            });
 
-function resetMap() {
-    if (marker) { marker.setMap(null); marker = null; }
-    if (realMarker) { realMarker.setMap(null); realMarker = null; }
-    if (lineBetween) { lineBetween.setMap(null); lineBetween = null; }
+            socket.on('gameEnd', (finalScores) => {
+                alert('Игра окончена!\nТвои очки: ' + finalScores[socket.id] + '\nОппонент: ' + finalScores[Object.keys(finalScores).find(k => k !== socket.id)]);
+            });
 
-    map.setCenter({ lat: 54.6, lng: 27.0 });
-    map.setZoom(5);
-}
+            socket.on('opponentDisconnected', () => {
+                alert('Оппонент вышел из игры.');
+                setTimeout(() => window.location.href = 'modes.html', 2000);
+            });
+        }
 
-/* ────────────────────────── SCORE SYSTEM ────────────────────────── */
+        // ──────────────────────────────────────────────
+        // Запуск
+        // ──────────────────────────────────────────────
+        window.onload = function() {
+            initPanorama();
+            initMap();
+            startTimer();
 
-function saveScore(score) {
-    const key = currentLocation.name;
-    let scores = JSON.parse(localStorage.getItem("scores")) || {};
-
-    if (!scores[key]) scores[key] = [];
-
-    scores[key].push(score);
-    scores[key].sort((a,b) => b - a);
-    scores[key] = scores[key].slice(0,5);
-
-    localStorage.setItem("scores", JSON.stringify(scores));
-
-    updateScoreboard(key);
-}
-
-function updateScoreboard(key) {
-    const scores = JSON.parse(localStorage.getItem("scores")) || {};
-    const list = document.getElementById("score-list");
-    list.innerHTML = "";
-
-    if (!scores[key]) {
-        list.innerHTML = "<div>Нет результатов</div>";
-        return;
-    }
-
-    scores[key].forEach((score, i) => {
-        const div = document.createElement("div");
-        div.textContent = `${i+1}. ${score} очков`;
-        list.appendChild(div);
-    });
-}
-
-/* ────────────────────────── START ────────────────────────── */
-
-document.getElementById("calculate-distance").addEventListener("click", calculateDistance);
-
-window.onload = function() {
-    initPanorama();
-    initMap();
-    startTimer();
-	const socket = io();
-const urlParams = new URLSearchParams(window.location.search);
-const roomId = urlParams.get('room');
-const isMultiplayer = !!roomId;
-
-if (isMultiplayer) {
-  socket.emit('joinRoom', roomId); // Если нужно, но уже joined на сервере
-  // Слушаем события
-  socket.on('newRound', ({ round, location }) => {
-    currentLocation = { lat: location.lat, lng: location.lng }; // Подставь в твою логику
-    initPanorama();
-    startTimer();
-    resetMap();
-  });
-
-  socket.on('roundEnd', ({ realLocation, guesses, scores, distances }) => {
-    showRealLocation(); // Твоя функция
-    // Показ оппонента
-    const oppGuess = guesses[myPlayer === 'player1' ? 'player2' : 'player1'];
-    showOpponentMarker(oppGuess.lat, oppGuess.lng);
-    // Попап с очками
-    alert(`Твои очки: ${scores[myPlayer]}\nОппонент: ${scores[myPlayer === 'player1' ? 'player2' : 'player1']}`);
-  });
-
-  socket.on('gameEnd', (rounds) => {
-    // Финальный экран
-    alert('Игра окончена!');
-  });
-
-  socket.on('opponentDisconnected', () => {
-    alert('Оппонент вышел. Игра завершена.');
-  });
-}
-};
-
-</script>
+            // Hover логика (как была)
+            mapContainer.classList.add("hoverable");
+            mapContainer.addEventListener("mouseenter", () => {
+                if (!markerPlaced) {
+                    mapContainer.style.width = "533px";
+                    mapContainer.style.height = "520px";
+                    buttonContainer.style.top = "540px";
+                }
+            });
+            mapContainer.addEventListener("mouseleave", () => {
+                if (!markerPlaced) {
+                    mapContainer.style.width = "410px";
+                    mapContainer.style.height = "340px";
+                    buttonContainer.style.top = "300px";
+                }
+            });
+        };
+    </script>
 </body>
 </html>
-
-
