@@ -17,7 +17,6 @@
     </style>
 </head>
 <body>
-
 <main>
     <div class="title">Парная игра</div>
     <select id="mode">
@@ -33,12 +32,13 @@
 </main>
 
 <script>
-    const socket = io();  // Подключение к серверу
+    const socket = io();
 
     document.getElementById('findGame').onclick = () => {
         const mode = document.getElementById('mode').value;
         socket.emit('joinQueue', mode);
         document.getElementById('status').textContent = 'Поиск оппонента...';
+        document.getElementById('findGame').disabled = true;
     };
 
     socket.on('status', msg => {
@@ -46,7 +46,17 @@
     });
 
     socket.on('gameStart', ({ roomId, mode }) => {
-        window.location.href = `${mode}.html?room=${roomId}`;
+        document.getElementById('status').textContent = 'Игра найдена! Загрузка...';
+        
+        // Ждём первую локацию от сервера
+        socket.once('newRound', (data) => {
+            const lat = data.location.lat;
+            const lng = data.location.lng;
+            console.log('Получена стартовая локация:', lat, lng);
+
+            // Перенаправляем с координатами в URL
+            window.location.href = `${mode}.html?room=${roomId}&lat=${lat}&lng=${lng}`;
+        });
     });
 </script>
 </body>
