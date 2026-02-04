@@ -4,77 +4,156 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BelGuessr - угадай город!</title>
-
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
     <style>
-        body { margin: 0; font-family: Arial, sans-serif; overflow: hidden; background-color: #f4f4f9; }
-        #top-scores { position: relative; z-index: 10; }
-        #score-list { position: relative; z-index: 10; }
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            background-color: #f4f4f9;
+        }
+        #panorama {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
         #map-container {
-            float: right; position: relative; top: 10px; right: 10px;
-            width: 287px; height: 280px; border: 2px solid #000; border-radius: 8px;
-            background-color: #fff; z-index: 2; box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 287px;
+            height: 280px;
+            border: 2px solid #000;
+            border-radius: 8px;
+            background-color: #fff;
+            z-index: 10; /* поверх панорамы */
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
             transition: width 0.3s, height 0.3s;
         }
-        #map-container.hoverable:hover { width: 533px; height: 520px; }
+        #map-container.hoverable:hover {
+            width: 533px;
+            height: 520px;
+        }
         #button-container {
-            position: absolute; top: calc(10px + 280px + 10px); right: 10px; z-index: 2;
-            display: flex; gap: 7px; width: 287px; transition: top 0.3s, width 0.3s;
+            position: absolute;
+            top: calc(10px + 280px + 10px);
+            right: 10px;
+            z-index: 11;
+            display: flex;
+            gap: 7px;
+            width: 287px;
+            transition: top 0.3s, width 0.3s;
         }
         #button-container button {
-            flex: 1; padding: 10px 0; font-size: 14px; font-weight: bold;
-            border-radius: 20px; border: none; cursor: pointer;
-            background-color: #007bff; color: #fff; transition: background-color 0.3s, flex 0.3s;
+            flex: 1;
+            padding: 10px 0;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 20px;
+            border: none;
+            cursor: pointer;
+            background-color: #007bff;
+            color: #fff;
+            transition: background-color 0.3s;
         }
-        #button-container button:hover { background-color: #66CDAA; }
+        #button-container button:hover {
+            background-color: #66CDAA;
+        }
         #leavebutton {
-            position: absolute; top: calc(10px + 280px + 60px); right: 10px; z-index: 2;
-            transition: top 0.3s, right 0.3s;
+            position: absolute;
+            top: calc(10px + 280px + 60px);
+            right: 10px;
+            z-index: 11;
+            transition: top 0.3s;
         }
         #calculate-distance, #leave {
-            padding: 10px 20px; font-size: 16px; font-weight: bold;
-            color: #fff; background-color: #007bff; border: none;
-            border-radius: 30px; width: 270px; cursor: pointer;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 30px;
+            width: 270px;
+            cursor: pointer;
         }
-        #calculate-distance:hover, #leave:hover { background-color: #66CDAA; }
+        #calculate-distance:hover, #leave:hover {
+            background-color: #66CDAA;
+        }
         #popup, #markerPopup, #timeup {
-            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background-color: white; padding: 20px; border-radius: 20px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2); z-index: 10; text-align: center;
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 20;
+            text-align: center;
         }
-        #popup h2, #timeup h2 { margin: 0 0 10px; }
         #popup button, #timeup button, #markerPopup button {
-            padding: 10px 20px; font-size: 14px; background-color: #007bff; color: white;
-            border: none; border-radius: 20px; cursor: pointer;
+            padding: 10px 20px;
+            font-size: 14px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
         }
-        #popup button:hover, #timeup button:hover, #markerPopup button:hover { background-color: #66CDAA; }
+        #popup button:hover, #timeup button:hover, #markerPopup button:hover {
+            background-color: #66CDAA;
+        }
         #overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(0,0,0,0.5); z-index: 9;
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 19;
         }
-        #panorama { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
         #timer {
-            position: absolute; top: 20px; left: 20px; font-size: 24px; font-weight: bold;
-            color: #fff; background-color: rgba(0,0,0,0.7); padding: 10px 20px;
-            border-radius: 10px; z-index: 10; display: none; /* скрыт по умолчанию */
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #fff;
+            background-color: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 10px;
+            z-index: 12;
+            display: none;
         }
         #status-message {
-            position: absolute; top: 70px; left: 20px; font-size: 18px;
-            color: #fff; background: rgba(0,0,0,0.6); padding: 8px 16px;
-            border-radius: 8px; z-index: 10; display: none;
+            position: absolute;
+            top: 70px;
+            left: 20px;
+            font-size: 18px;
+            color: #fff;
+            background: rgba(0,0,0,0.6);
+            padding: 8px 16px;
+            border-radius: 8px;
+            z-index: 12;
+            display: none;
         }
-        #leavebutton { position: absolute; right: 75px; top: 490px; z-index: 2; }
     </style>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBGbr_QILBhKjlGn5KywwhRM4qZEYR3vXk&libraries=geometry"></script>
 </head>
 <body>
+    <div id="panorama"></div>
     <div id="map-container" class="hoverable"></div>
     <div id="button-container">
         <button id="calculate-distance">Guess!</button>
         <button id="leave" onclick="window.location.href='index.html'">Выйти</button>
     </div>
-    <div id="panorama"></div>
     <div id="popup">
         <h2>Кол-во очков: <span id="score"></span></h2>
         <p>Локация: <span id="location-name"></span>.</p>
@@ -105,7 +184,7 @@
         let realMarker = null;
         let lineBetween = null;
         let opponentMarker = null;
-        let panoramaLocation = null; // Важно: null по умолчанию
+        let panoramaLocation = null;
         let timeLeft = 30;
         let timerInterval;
         let markerPlaced = false;
@@ -179,12 +258,16 @@
                     }
                 );
             }
-
-            updateScoreboard(panoramaLocation.name || "Неизвестно");
         }
 
         function initMap() {
-            map = new google.maps.Map(document.getElementById("map-container"), {
+            const container = document.getElementById("map-container");
+            if (!container) {
+                console.error("Контейнер карты не найден!");
+                return;
+            }
+
+            map = new google.maps.Map(container, {
                 center: { lat: 53.9008985, lng: 27.5717368 },
                 zoom: 5,
             });
@@ -196,15 +279,16 @@
                     map: map,
                 });
                 markerPlaced = true;
-                mapContainer.style.width = "533px";
-                mapContainer.style.height = "520px";
+                container.style.width = "533px";
+                container.style.height = "520px";
                 buttonContainer.style.top = "540px";
                 leaveButton.style.top = "610px";
-                mapContainer.classList.remove("hoverable");
+                container.classList.remove("hoverable");
+                google.maps.event.trigger(map, "resize");
             });
         }
 
-        // Hover-логика (как была)
+        // Hover-логика
         const mapContainer = document.getElementById("map-container");
         const buttonContainer = document.getElementById("button-container");
         const leaveButton = document.getElementById("leavebutton");
@@ -216,23 +300,25 @@
                 mapContainer.style.height = "520px";
                 buttonContainer.style.top = "540px";
                 leaveButton.style.top = "610px";
+                google.maps.event.trigger(map, "resize");
             }
         });
+
         mapContainer.addEventListener("mouseleave", () => {
             if (!markerPlaced) {
                 mapContainer.style.width = "287px";
                 mapContainer.style.height = "280px";
                 buttonContainer.style.top = "300px";
                 leaveButton.style.top = "370px";
+                google.maps.event.trigger(map, "resize");
             }
         });
 
-        // ──────────────────────────────────────────────
-        // Кнопка "Guess!"
-        // ──────────────────────────────────────────────
+        // Кнопка Guess!
         document.getElementById("calculate-distance").addEventListener("click", function() {
             if (!marker) {
-                OpenMarkerPopup();
+                document.getElementById('markerPopup').style.display = 'block';
+                document.getElementById('overlay').style.display = 'block';
                 return;
             }
 
@@ -254,7 +340,6 @@
                 document.getElementById("status-message").style.display = "block";
                 document.getElementById("status-message").textContent = "Ждём второго игрока...";
             } else {
-                // Одиночная логика
                 const distance = google.maps.geometry.spherical.computeDistanceBetween(
                     new google.maps.LatLng(panoramaLocation.lat, panoramaLocation.lng),
                     pos
@@ -270,12 +355,12 @@
 
                 saveScore(score);
                 stopTimer();
-
-                showRealLocation(() => openPopup());
+                showRealLocation(() => {
+                    document.getElementById("popup").style.display = "block";
+                    document.getElementById("overlay").style.display = "block";
+                });
             }
         });
-
-        // Остальные функции (TimeUp, openPopup, closePopup, resetMap, saveScore, updateScoreboard, showRealLocation) остаются без изменений
 
         // Мультиплеер события
         if (isMultiplayer) {
@@ -285,6 +370,7 @@
 
             socket.on('newRound', (data) => {
                 panoramaLocation = { lat: data.location.lat, lng: data.location.lng };
+                mapContainer.style.display = "block"; // показываем карту
                 resetMap();
                 initPanorama();
                 document.getElementById("timer").style.display = "none";
@@ -313,7 +399,8 @@
                     document.getElementById("distanceInKm").innerText = myResult.dist;
                     document.getElementById("location-name").innerText = "Секретная локация";
                     document.getElementById("popup").innerHTML += `<p><b>Победитель раунда: ${data.winner === socket.id ? 'Ты' : 'Оппонент'}</b></p>`;
-                    openPopup();
+                    document.getElementById("popup").style.display = "block";
+                    document.getElementById("overlay").style.display = "block";
                 });
             });
 
@@ -335,23 +422,25 @@
 
         // Запуск
         window.onload = function () {
+            initMap(); // сначала карта
+
             if (!isMultiplayer) {
                 panoramaLocation = getRandomLocation();
                 initPanorama();
                 startTimer();
             }
-            initMap();
 
-            const mapContainer = document.getElementById("map-container");
+            // Hover
             mapContainer.addEventListener("mouseenter", () => {
-                setTimeout(() => google.maps.event.trigger(map, "resize"), 310);
+                if (!markerPlaced) {
+                    google.maps.event.trigger(map, "resize");
+                }
             });
             mapContainer.addEventListener("mouseleave", () => {
-                setTimeout(() => google.maps.event.trigger(map, "resize"), 310);
+                if (!markerPlaced) {
+                    google.maps.event.trigger(map, "resize");
+                }
             });
-
-            mapContainer.classList.add("hoverable");
-            // ... все твои addEventListener для hover остаются
         };
     </script>
 </body>
